@@ -988,8 +988,8 @@ int load_bamfiles(struct opt_aux *f, aux_t * a, bamflag_t * fs)
  
 struct regcov
 {
-    uint64_t cnt, cnt4, cnt10, cnt30, cnt100, cntx;
-    float    cov, cov4, cov10, cov30, cov100, covx;
+    uint64_t cnt, cnt4, cnt10, cnt20, cnt50, cnt100, cnt200, cntx;
+    float    cov, cov4, cov10, cov20, cov50, cov100, cov200, covx;
 };
 
 struct regcov * regcov_init()
@@ -1010,8 +1010,10 @@ uint64_t cntcov_cal(struct opt_aux *f,
     {
 	(*data) += cnt->a[i] * i;
 	rawcnt += cnt->a[i];
+	if (i < 200) cov->cnt200 += cnt->a[i];
 	if (i < 100) cov->cnt100 += cnt->a[i];
-	if (i < 30)  cov->cnt30 += cnt->a[i];
+	if (i < 50)  cov->cnt50 += cnt->a[i];
+	if (i < 20)  cov->cnt20 += cnt->a[i];
 	if (i < 10)  cov->cnt10 += cnt->a[i];
 	if (i < 4) cov->cnt4 += cnt->a[i];
 	if (f->cutoff && i < f->cutoff) cov->cntx += cnt->a[i];
@@ -1020,13 +1022,17 @@ uint64_t cntcov_cal(struct opt_aux *f,
     cov->cnt = rawcnt - (uint64_t)cnt->a[0];
     cov->cnt4 = rawcnt - cov->cnt4;
     cov->cnt10 = rawcnt - cov->cnt10;
-    cov->cnt30 = rawcnt - cov->cnt30;
+    cov->cnt20 = rawcnt - cov->cnt20;
+    cov->cnt50 = rawcnt - cov->cnt50;
     cov->cnt100 = rawcnt - cov->cnt100;
+    cov->cnt200 = rawcnt - cov->cnt200;
     cov->cov = (float)cov->cnt / rawcnt * 100;
     cov->cov4 = (float)cov->cnt4 / rawcnt *100;
     cov->cov10 = (float)cov->cnt10 / rawcnt * 100;
-    cov->cov30 = (float)cov->cnt30 / rawcnt *100;
+    cov->cov20 = (float)cov->cnt20 / rawcnt * 100;
+    cov->cov50 = (float)cov->cnt50 / rawcnt *100;
     cov->cov100 = (float)cov->cnt100 / rawcnt*100;
+    cov->cov200 = (float)cov->cnt200 / rawcnt*100;
     if (f->cutoff)
     {
 	cov->cntx = rawcnt - cov->cntx;
@@ -1093,8 +1099,8 @@ int print_report(struct opt_aux *f, aux_t * a, bamflag_t * fs)
 
     FILE *fchrcov = open_wfile("chromosomes.report");
 	{
-	    fprintf(fchrcov, "%11s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s",
-		    "#Chromosome","DATA(%)","Avg depth","Median","Coverage%","Cov 4x %","Cov 10x %","Cov 30x %","Cov 100x %");
+	    fprintf(fchrcov, "%11s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s",
+		    "#Chromosome","DATA(%)","Avg depth","Median","Coverage%","Cov 4x %","Cov 10x %","Cov 20x %","Cov 50x %","Cov 100x %","Cov 200x %");
 	    if(f->cutoff) fprintf(fchrcov, "\tCov %dx", f->cutoff);
 	    fprintf(fchrcov,"\n");
 	    khiter_t k;
@@ -1116,14 +1122,14 @@ int print_report(struct opt_aux *f, aux_t * a, bamflag_t * fs)
 			avg = (float)data/ length;
 			med = median_cnt(cnt);
 			per = (float)data/fs->n_tdata*100.0;
-			fprintf(fchrcov, "%11s\t%8.2f\t%8.2f\t%9.1f\t%8.2f\t%8.2f\t%8.2f\t%8.2f\t%8.2f",
-				name, per, avg, med, chrcov->cov, chrcov->cov4, chrcov->cov10, chrcov->cov30, chrcov->cov100);
+			fprintf(fchrcov, "%11s\t%8.2f\t%8.2f\t%9.1f\t%8.2f\t%8.2f\t%8.2f\t%8.2f\t%8.2f\t%8.2f\t%8.2f",
+				name, per, avg, med, chrcov->cov, chrcov->cov4, chrcov->cov10, chrcov->cov20, chrcov->cov50, chrcov->cov100, chrcov->cov200);
 			if (f->cutoff) fprintf(fchrcov, "\t%.2f", chrcov->covx);
 		    }
 		    else
 		    {
-			fprintf(fchrcov, "%11s\t%8.2f\t%8.2f\t%8.1f\t%8.1f\t%8.1f\t%8.1f\t%8.1f\t%8.1f",
-				name, (float)0, (float)0, (float)0, (float)0, (float)0, (float)0, (float)0, (float)0);
+			fprintf(fchrcov, "%11s\t%8.2f\t%8.2f\t%8.1f\t%8.1f\t%8.1f\t%8.1f\t%8.1f\t%8.1f\t%8.1f\t%8.1f",
+				name, (float)0, (float)0, (float)0, (float)0, (float)0, (float)0, (float)0, (float)0, (float)0, (float)0);
 			if (f->cutoff) fprintf(fchrcov, "\t%5.4f", (float)0);
 		    }
 		    fprintf(fchrcov, "\n");
@@ -1179,8 +1185,10 @@ int print_report(struct opt_aux *f, aux_t * a, bamflag_t * fs)
 	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Coverage (>0x)", tarcov->cov);
 	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Coverage (>=4x)", tarcov->cov4);
 	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Coverage (>=10x)", tarcov->cov10);
-	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Coverage (>=30x)", tarcov->cov30);
+	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Coverage (>=20x)", tarcov->cov20);
+	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Coverage (>=50x)", tarcov->cov50);
 	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Coverage (>=100x)", tarcov->cov100);
+	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Coverage (>=200x)", tarcov->cov200);
 	    if (f->cutoff)
 	    {
 		char titles[40];
@@ -1193,8 +1201,10 @@ int print_report(struct opt_aux *f, aux_t * a, bamflag_t * fs)
 	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Fraction Region covered > 0x", regcov->cov);
 	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Fraction Region covered >= 4x", regcov->cov4);
 	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Fraction Region covered >= 10x", regcov->cov10);
-	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Fraction Region covered >= 30x", regcov->cov30);
+	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Fraction Region covered >= 20x", regcov->cov20);
+	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Fraction Region covered >= 50x", regcov->cov50);
 	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Fraction Region covered >= 100x", regcov->cov100);
+	    fprintf(fc, "%60s\t%.2f%%\n", "[Target] Fraction Region covered >= 200x", regcov->cov200);
             if (f->cutoff)
 	    {
 		char titles[60];
@@ -1216,8 +1226,10 @@ int print_report(struct opt_aux *f, aux_t * a, bamflag_t * fs)
 	    fprintf(fc, "%60s\t%.2f%%\n", "[flank] Coverage (>0x)", flkcov->cov);
 	    fprintf(fc, "%60s\t%.2f%%\n", "[flank] Coverage (>=4x)", flkcov->cov4);
 	    fprintf(fc, "%60s\t%.2f%%\n", "[flank] Coverage (>=10x)", flkcov->cov10);
-	    fprintf(fc, "%60s\t%.2f%%\n", "[flank] Coverage (>=30x)", flkcov->cov30);
+	    fprintf(fc, "%60s\t%.2f%%\n", "[flank] Coverage (>=20x)", flkcov->cov20);
+	    fprintf(fc, "%60s\t%.2f%%\n", "[flank] Coverage (>=50x)", flkcov->cov50);
 	    fprintf(fc, "%60s\t%.2f%%\n", "[flank] Coverage (>=100x)", flkcov->cov100);
+	    fprintf(fc, "%60s\t%.2f%%\n", "[flank] Coverage (>=200x)", flkcov->cov200);
             if (f->cutoff)
             {
 		char titles[40];
